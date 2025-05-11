@@ -1,0 +1,63 @@
+
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+
+const app = express();
+app.use(bodyParser.json());
+app.use(cors());
+mongoose.connect('mongodb+srv://new_user:123@cluster0.zhfof.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => console.log('MongoDB connected successfully'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'connection error:'));
+db.once('open', () => {
+  console.log('Connected to MongoDB');
+});
+
+// Define a schema for storing steganography data
+const StegoSchema = new mongoose.Schema({
+  password: String,
+  encodedText: String,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const StegoData = mongoose.model('StegoData', StegoSchema);
+
+// Routes
+app.post('/store', async (req, res) => {
+  const { password, encodedText } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 8);
+
+  const stegoData = new StegoData({ password: hashedPassword, encodedText });
+  await stegoData.save();
+
+  res.status(201).send({ id: stegoData._id });
+});
+
+app.post('/retrieve', async (req, res) => {
+  const { id, password } = req.body;
+
+  const stegoData = await StegoData.findById(id);
+  if (!stegoData) {
+    return res.status(404).send('Data not found');
+  }
+
+  const isMatch = await bcrypt.compare(password, stegoData.password);
+  if (!isMatch) {
+    return res.status(401).send('Incorrect password');
+  }
+
+  res.status(200).send({ encodedText: stegoData.encodedText });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

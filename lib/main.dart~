@@ -150,7 +150,7 @@ class _StegoScreenState extends State<StegoScreen> {
             ),
             TextField(
               controller: _retrievePasswordController,
-
+              
               decoration: InputDecoration(labelText: 'Password'),
             ),
             ElevatedButton(

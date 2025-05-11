@@ -13,7 +13,7 @@ class _DecodingPageState extends State<DecodingPage> {
   String _decodedText = '';
 
   void _decodeText() async {
-    var url = Uri.parse('https://steganography-iota.vercel.app/retrieve');
+    var url = Uri.parse('https://steganography-psi.vercel.app/retrieve');
     var response = await http.post(url, body: {
       'id': _idController.text,
       'password': _passwordController.text,

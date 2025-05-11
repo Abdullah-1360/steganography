@@ -1,61 +1,6 @@
-// import 'package:flutter/material.dart';
-// import 'package:steganography/screens/decode_page.dart';
-// import 'package:steganography/screens/encode_page.dart';
-//
-// void main() {
-//   runApp(MyApp());
-// }
-//
-// class MyApp extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Steganography App',
-//       theme: ThemeData(
-//         primarySwatch: Colors.blue,
-//       ),
-//       home: MyHomePage(),
-//     );
-//   }
-// }
-//
-// class MyHomePage extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('Steganography App'),
-//       ),
-//       body: Center(
-//         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: [
-//             ElevatedButton(
-//               onPressed: () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(builder: (context) => EncodingPage()),
-//                 );
-//               },
-//               child: Text('Encode Text'),
-//             ),
-//             SizedBox(height: 20),
-//             ElevatedButton(
-//               onPressed: () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(builder: (context) => DecodingPage()),
-//                 );
-//               },
-//               child: Text('Decode Text'),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:steganography/stegoservice.dart'; // Import your service file
 
 void main() => runApp(MyApp());
@@ -121,46 +66,189 @@ class _StegoScreenState extends State<StegoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Stego Service')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Store section
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(labelText: 'Password'),
-            ),
-            TextField(
-              controller: _encodedTextController,
-              decoration: InputDecoration(labelText: 'Encoded Text'),
-            ),
-            ElevatedButton(
-              onPressed: _storeData,
-              child: Text('Store Data'),
-            ),
-            Text(_storedId ?? ''),
+      appBar: AppBar(
+        title: const Text('Stego Service', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        elevation: 4,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Store Section
+              Card(
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Store Data',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _passwordController,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _encodedTextController,
+                        decoration: InputDecoration(
+                          labelText: 'Encoded Text',
+                          prefixIcon: const Icon(Icons.text_snippet),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: _storeData,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 20,horizontal: 40),
 
-            SizedBox(height: 20),
+                          ),
 
-            // Retrieve section
-            TextField(
-              controller: _retrieveIdController,
-              decoration: InputDecoration(labelText: 'Data ID'),
-            ),
-            TextField(
-              controller: _retrievePasswordController,
+                          child: const Text('Store Securely'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_storedId != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.green),
 
-              decoration: InputDecoration(labelText: 'Password'),
-            ),
-            ElevatedButton(
-              onPressed: _retrieveData,
-              child: Text('Retrieve Data'),
-            ),
-            Text(_retrievedText ?? ''),
-          ],
+                              SelectableText(
+                                'Stored ID: $_storedId',
+                                style: const TextStyle(color: Colors.green),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Retrieve Section
+              Card(
+                elevation: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Retrieve Data',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _retrieveIdController,
+                        decoration: InputDecoration(
+                          labelText: 'Data ID',
+                          prefixIcon: const Icon(Icons.numbers),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _retrievePasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: _retrieveData,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14,horizontal: 40),
+
+                          ),
+
+                          child: const Text('Retrieve Data'),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_retrievedText != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Retrieved Text:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(_retrievedText!),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
 }
+
+
+

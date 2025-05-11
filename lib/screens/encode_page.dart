@@ -11,7 +11,7 @@ class _EncodingPageState extends State<EncodingPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   void _encodeText() async {
-    var url = Uri.parse('http://localhost:5000/store');
+    var url = Uri.parse('https://steganography-iota.vercel.app/store');
     var response = await http.post(url, body: {
       'password': _passwordController.text,
       'encodedText': _textController.text,

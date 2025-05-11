@@ -1,129 +1,55 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-class EncodePage extends StatefulWidget {
-  const EncodePage({super.key});
-
+class EncodingPage extends StatefulWidget {
   @override
-  _EncodePageState createState() => _EncodePageState();
+  _EncodingPageState createState() => _EncodingPageState();
 }
 
-class _EncodePageState extends EncodePage with TickerProvider {
-  final _textController = TextEditingController();
-  final _passwordController = TextEditingController();
-  img.Image? _image;
-  bool _isProcessing = false;
-  AnimationController? _animationController;
-  final GlobalKey<ScaffoldMessengerState> _scaffoldKey = GlobalKey();
+class _EncodingPageState extends State<EncodingPage> {
+  final TextEditingController _textController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-  }
-
-  Future<void> _pickImage() async {
-    // Implement image picker logic here
-  }
-
-  Future<img.Image> _encodeText(img.Image image, String text) async {
-    List<int> bytes = utf8.encode(text);
-    int len = bytes.length;
-    List<int> lenBytes = [
-      (len >> 24) & 0xFF,
-      (len >> 16) & 0xFF,
-      (len >> 8) & 0xFF,
-      len & 0xFF,
-    ];
-    List<int> combined = [...lenBytes, ...bytes];
-    String binary = combined.map((b) => b.toRadixString(2).padLeft(8, '0')).join();
-
-    int bitIndex = 0;
-    for (int y = 0; y < image.height; y++) {
-      for (int x = 0; x < image.width; x++) {
-        if (bitIndex >= binary.length) break;
-        int pixel = image.getPixel(x, y);
-        int r = (pixel >> 16) & 0xFF;
-        r = (r & 0xFE) | int.parse(binary[bitIndex]);
-        image.setPixel(x, y, (pixel & 0x00FFFF) | (r << 16));
-        bitIndex++;
-      }
-      if (bitIndex >= binary.length) break;
-    }
-    return image;
-  }
-
-  Future<void> _encodeAndUpload() async {
-    _animationController?.forward();
-    try {
-      if (_image == null || _textController.text.isEmpty) return;
-
-      img.Image encodedImage = await _encodeText(_image!, _textController.text);
-      List<int> pngBytes = img.encodePng(encodedImage);
-
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://localhost:3000/api/encode'),
+  void _encodeText() async {
+    var url = Uri.parse('http://localhost:5000/store');
+    var response = await http.post(url, body: {
+      'password': _passwordController.text,
+      'encodedText': _textController.text,
+    });
+    if (response.statusCode == 201) {
+      var id = response.body;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Text encoded successfully. ID: $id')),
       );
-      request.files.add(
-        http.MultipartFile.fromBytes('image', pngBytes, filename: 'encoded.png'),
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error encoding text')),
       );
-      request.fields['password'] = _passwordController.text;
-
-      await request.send();
-      _scaffoldKey.currentState?.showSnackBar(
-        const SnackBar(content: Text('Encoding successful!')),
-      );
-    } catch (e) {
-      print('Error: $e');
-    } finally {
-      _animationController?.reverse();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScaffoldMessenger(
-      key: _scaffoldKey,
-      child: Padding(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Encode Text'),
+      ),
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
               controller: _textController,
-              decoration: const InputDecoration(labelText: 'Text to hide'),
-              maxLines: 3,
+              decoration: InputDecoration(labelText: 'Text to Encode'),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Select Image'),
-              onPressed: _pickImage,
-            ),
-            const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
-            const SizedBox(height: 16),
-            ScaleTransition(
-              scale: CurvedAnimation(
-                parent: _animationController!,
-                curve: Curves.easeInOut,
-              ),
-              child: ElevatedButton(
-                onPressed: _encodeAndUpload,
-                child: const Text('Encode & Upload'),
-              ),
+            ElevatedButton(
+              onPressed: _encodeText,
+              child: Text('Encode'),
             ),
           ],
         ),

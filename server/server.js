@@ -1,96 +1,41 @@
-require('dotenv').config();
+require('dotenv').config();const tf = require('@tensorflow/tfjs'); // instead of tfjs-node
+
 const express = require('express');
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
+const upload = multer({ dest: 'uploads/' });
 
-// Middleware
-app.use(helmet());
-app.use(morgan('combined'));
-app.use(bodyParser.json());
+// Load the model
+const modelPath = path.join(__dirname, 'model_js');
+let model;
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use(limiter);
+async function loadModel() {
+  model = await tf.loadLayersModel(`file://${modelPath}/model.json`);
+  console.log('Model loaded');
+}
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*'
-}));
+loadModel();
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1);
-});
+app.post('/predict', upload.single('image'), async (req, res) => {
+  const imagePath = req.file.path;
 
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
+  // Load the image
+  const img = tf.node.decodeImage(fs.readFileSync(imagePath));
+  const resizedImg = tf.image.resizeBilinear(img, [256, 256]);
+  const normalizedImg = resizedImg.div(tf.scalar(255.0));
+  const batchedImg = normalizedImg.expandDims(0);
 
-// Schema and Model
-const StegoSchema = new mongoose.Schema({
-  password: String,
-  encodedText: String,
-  createdAt: { type: Date, default: Date.now }
-});
+  // Make prediction
+  const prediction = model.predict(batchedImg);
+  const predictedClass = prediction.argMax(1).dataSync()[0];
 
-const StegoData = mongoose.model('StegoData', StegoSchema);
+  // Clean up
+  fs.unlinkSync(imagePath);
 
-// Routes with Input Validation
-app.post('/store', async (req, res) => {
-  const { password, encodedText } = req.body;
-
-  if (!password || !encodedText) {
-    return res.status(400).send('Missing required fields');
-  }
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const stegoData = new StegoData({ password: hashedPassword, encodedText });
-    await stegoData.save();
-    res.status(201).send({ id: stegoData._id });
-  } catch (error) {
-    console.error('Error storing data:', error);
-    res.status(500).send('Internal server error');
-  }
-});
-
-app.post('/retrieve', async (req, res) => {
-  const { id, password } = req.body;
-
-  if (!id || !password) {
-    return res.status(400).send('Missing required fields');
-  }
-
-  try {
-    const stegoData = await StegoData.findById(id);
-    if (!stegoData) {
-      return res.status(404).send('Data not found');
-    }
-
-    const isMatch = await bcrypt.compare(password, stegoData.password);
-    if (!isMatch) {
-      return res.status(401).send('Incorrect password');
-    }
-
-    res.status(200).send({ encodedText: stegoData.encodedText });
-  } catch (error) {
-    console.error('Error retrieving data:', error);
-    res.status(500).send('Internal server error');
-  }
+  res.json({ predictedClass });
 });
 
 const PORT = process.env.PORT || 3000;

@@ -1,4 +1,4 @@
-require('dotenv').config();const tf = require('@tensorflow/tfjs'); // instead of tfjs-node
+const tf = require('@tensorflow/tfjs'); // instead of tfjs-node
 
 const express = require('express');
 const multer = require('multer');

@@ -1,60 +1,41 @@
+require('dotenv').config();const tf = require('@tensorflow/tfjs'); // instead of tfjs-node
 
 const express = require('express');
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
-app.use(bodyParser.json());
-app.use(cors());
-mongoose.connect('mongodb+srv://new_user:123@cluster0.zhfof.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster0', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+const upload = multer({ dest: 'uploads/' });
 
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', () => {
-  console.log('Connected to MongoDB');
-});
+// Load the model
+const modelPath = path.join(__dirname, 'model_js');
+let model;
 
-// Define a schema for storing steganography data
-const StegoSchema = new mongoose.Schema({
-  password: String,
-  encodedText: String,
-  createdAt: { type: Date, default: Date.now }
-});
+async function loadModel() {
+  model = await tf.loadLayersModel(`file://${modelPath}/model.json`);
+  console.log('Model loaded');
+}
 
-const StegoData = mongoose.model('StegoData', StegoSchema);
+loadModel();
 
-// Routes
-app.post('/store', async (req, res) => {
-  const { password, encodedText } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 8);
+app.post('/predict', upload.single('image'), async (req, res) => {
+  const imagePath = req.file.path;
 
-  const stegoData = new StegoData({ password: hashedPassword, encodedText });
-  await stegoData.save();
+  // Load the image
+  const img = tf.node.decodeImage(fs.readFileSync(imagePath));
+  const resizedImg = tf.image.resizeBilinear(img, [256, 256]);
+  const normalizedImg = resizedImg.div(tf.scalar(255.0));
+  const batchedImg = normalizedImg.expandDims(0);
 
-  res.status(201).send({ id: stegoData._id });
-});
+  // Make prediction
+  const prediction = model.predict(batchedImg);
+  const predictedClass = prediction.argMax(1).dataSync()[0];
 
-app.post('/retrieve', async (req, res) => {
-  const { id, password } = req.body;
+  // Clean up
+  fs.unlinkSync(imagePath);
 
-  const stegoData = await StegoData.findById(id);
-  if (!stegoData) {
-    return res.status(404).send('Data not found');
-  }
-
-  const isMatch = await bcrypt.compare(password, stegoData.password);
-  if (!isMatch) {
-    return res.status(401).send('Incorrect password');
-  }
-
-  res.status(200).send({ encodedText: stegoData.encodedText });
+  res.json({ predictedClass });
 });
 
 const PORT = process.env.PORT || 3000;

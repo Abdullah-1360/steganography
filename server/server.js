@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ dest: '/tmp/' }); 
+
 
 
 // Load the model

@@ -1,255 +1,90 @@
-
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:steganography/stegoservice.dart'; // Import your service file
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: StegoScreen(),
+      title: 'Image Classifier',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: ImageClassifier(),
     );
   }
 }
 
-class StegoScreen extends StatefulWidget {
+class ImageClassifier extends StatefulWidget {
   @override
-  _StegoScreenState createState() => _StegoScreenState();
+  _ImageClassifierState createState() => _ImageClassifierState();
 }
 
-class _StegoScreenState extends State<StegoScreen> {
-  final StegoService _stegoService = StegoService();
-  final _passwordController = TextEditingController();
-  final _encodedTextController = TextEditingController();
-  final _retrieveIdController = TextEditingController();
-  final _retrievePasswordController = TextEditingController();
+class _ImageClassifierState extends State<ImageClassifier> {
+  File? _image;
+  String? _prediction;
 
-  String? _storedId;
-  String? _retrievedText;
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
-  Future<void> _storeData() async {
-    String password = _passwordController.text;
-    String encodedText = _encodedTextController.text;
-
-    if (password.isEmpty || encodedText.isEmpty) {
-      setState(() {
-        _storedId = 'Error: All fields required';
-      });
-      return;
-    }
-
-    String? id = await _stegoService.storeData(password, encodedText);
     setState(() {
-      _storedId = id ?? 'Error storing data';
+      if (pickedFile != null) {
+        _image = File(pickedFile.path);
+      }
     });
   }
 
-  Future<void> _retrieveData() async {
-    String id = _retrieveIdController.text;
-    String password = _retrievePasswordController.text;
+  Future<void> _predictImage() async {
+    if (_image == null) return;
 
-    if (id.isEmpty || password.isEmpty) {
-      setState(() {
-        _retrievedText = 'Error: All fields required';
-      });
-      return;
-    }
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('http://steganography-psi.vercel.app/predict'),
+    );
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'image',
+        await _image!.readAsBytes(),
+        filename: _image!.path.split('/').last,
+      ),
+    );
 
-    String? text = await _stegoService.retrieveData(id, password);
+    final response = await request.send();
+    final responseData = await response.stream.bytesToString();
+    final prediction = json.decode(responseData)['predictedClass'];
+
     setState(() {
-      _retrievedText = text ?? 'Error retrieving data';
+      _prediction = prediction;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Stego Service', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        elevation: 4,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Store Section
-              Card(
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Store Data',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _passwordController,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _encodedTextController,
-                        decoration: InputDecoration(
-                          labelText: 'Encoded Text',
-                          prefixIcon: const Icon(Icons.text_snippet),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: ElevatedButton(
-                          onPressed: _storeData,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 20,horizontal: 40),
-
-                          ),
-
-                          child: const Text('Store Securely'),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_storedId != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green[50],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle, color: Colors.green),
-
-                              SelectableText(
-                                'Stored ID: $_storedId',
-                                style: const TextStyle(color: Colors.green),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+      appBar: AppBar(title: Text('Image Classifier')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            _image == null
+                ? Text('No image selected.')
+                : Container(
+                  width: 200,
+                  height: 200,
+                  child: Image.file(_image!),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Retrieve Section
-              Card(
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Retrieve Data',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _retrieveIdController,
-                        decoration: InputDecoration(
-                          labelText: 'Data ID',
-                          prefixIcon: const Icon(Icons.numbers),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _retrievePasswordController,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        obscureText: true,
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: ElevatedButton(
-                          onPressed: _retrieveData,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14,horizontal: 40),
-
-                          ),
-
-                          child: const Text('Retrieve Data'),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_retrievedText != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Retrieved Text:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(_retrievedText!),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            SizedBox(height: 20),
+            ElevatedButton(onPressed: _pickImage, child: Text('Pick Image')),
+            ElevatedButton(onPressed: _predictImage, child: Text('Predict')),
+            if (_prediction != null) Text('Prediction: $_prediction'),
+          ],
         ),
       ),
     );
   }
-
 }
-
-
-
